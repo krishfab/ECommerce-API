@@ -36,7 +36,12 @@ module.exports.createProduct = (req, res) => {
 // Retrieve all product
 
 module.exports.getAllProducts = (req, res) => {
-  Product.find() // No filter = include active + archived
+
+    if (!req.user.isAdmin) {
+    return res.status(401).json({ message: "Forbidden: Admins only" });
+  }
+  
+  Product.find() 
     .then((products) => {
       if (!products || products.length === 0) {
         return res.status(404).send({
@@ -168,36 +173,58 @@ module.exports.activateProduct = async (req, res) => {
   }
 };
 
-// Search Products
+//Search Products
 
-// module.exports.searchProducts = async (req, res) => {
-//   try {
-//     const { name, minPrice, maxPrice } = req.query;
+// 1 - search by name
+module.exports.searchByName = async (req, res) => {
+  try {
+    const { name } = req.body; // ⬅️ changed from req.query
 
-//     const filter = {};
+    if (!name) {
+      return res.status(400).json({ message: "Product name is required" });
+    }
 
-//     // Search by name (case-insensitive)
-//     if (name) {
-//       filter.name = { $regex: name, $options: "i" };
-//     }
+    const products = await Product.find({
+      name: { $regex: name, $options: "i" },
+      isActive: true,
+    });
 
-//     // Search by price range
-//     if (minPrice || maxPrice) {
-//       filter.price = {};
-//       if (minPrice) filter.price.$gte = parseFloat(minPrice);
-//       if (maxPrice) filter.price.$lte = parseFloat(maxPrice);
-//     }
+    if (products.length === 0) {
+      return res.status(404).json({ message: "No products found" });
+    }
 
-//     const products = await Product.find(filter);
+    return res.status(200).json({ success: true, data: products });
 
-//     if (products.length === 0) {
-//       return res.status(404).json({ message: "No products matched the search criteria." });
-//     }
+  } catch (error) {
+    return errorHandler(error, req, res);
+  }
+};
+// 2- search by price
 
-//     return res.status(200).json({ results: products });
+module.exports.searchByPrice = async (req, res) => {
+  try {
+    const { minPrice, maxPrice } = req.body;
 
-//   } catch (error) {
-//     console.error("Search error:", error);
-//     return res.status(500).json({ message: "Server error during product search", error: error.message });
-//   }
-// };
+    if (!minPrice && !maxPrice) {
+      return res.status(400).json({ message: "Price range is required" });
+    }
+
+    const priceFilter = {};
+    if (minPrice) priceFilter.$gte = parseFloat(minPrice);
+    if (maxPrice) priceFilter.$lte = parseFloat(maxPrice);
+
+    const products = await Product.find({
+      price: priceFilter,
+      isActive: true,
+    });
+
+    if (products.length === 0) {
+      return res.status(404).json({ message: "No products found in this price range" });
+    }
+
+    return res.status(200).json({ success: true, data: products });
+
+  } catch (error) {
+    return errorHandler(error, req, res);
+  }
+};

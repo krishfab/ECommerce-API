@@ -47,6 +47,7 @@ module.exports.getCart = async (req, res) => {
   }
 };
 
+// ADD TO CART
 module.exports.addToCart = async (req, res) => {
   const userId = req.user.id;
   const { productId, quantity } = req.body;
@@ -57,34 +58,50 @@ module.exports.addToCart = async (req, res) => {
   }
 
   try {
-    // Optional: verify that product exists
-    const productExists = await Product.findById(productId);
-    if (!productExists) {
-      return res.status(404).json({ message: "Product not found." });
+    // Get the product to retrieve its price
+    const product = await Product.findById(productId);
+
+    if (!product || !product.isActive) {
+      return res.status(404).json({ message: "Product not found or inactive." });
     }
+
+    const productPrice = product.price;
 
     // Find user's cart
     let cart = await Cart.findOne({ userId });
 
     if (!cart) {
-      // No cart exists, create a new one
+      // Create new cart with subtotal
       cart = new Cart({
         userId,
-        cartItems: [{ productId, quantity }],
+        cartItems: [{
+          productId,
+          quantity,
+          subtotal: quantity * productPrice
+        }],
+        totalPrice: quantity * productPrice
       });
     } else {
-      // Check if the item already exists in cart
+      // Check if the product already exists in cart
       const existingItem = cart.cartItems.find(item =>
         item.productId.toString() === productId
       );
 
       if (existingItem) {
-        // If it exists, update the quantity
+        // Update quantity and subtotal
         existingItem.quantity += quantity;
+        existingItem.subtotal = existingItem.quantity * productPrice;
       } else {
-        // Else, push new item
-        cart.cartItems.push({ productId, quantity });
+        // Add new item with subtotal
+        cart.cartItems.push({
+          productId,
+          quantity,
+          subtotal: quantity * productPrice
+        });
       }
+
+      // Recalculate total price
+      cart.totalPrice = cart.cartItems.reduce((sum, item) => sum + item.subtotal, 0);
     }
 
     await cart.save();
@@ -151,30 +168,76 @@ module.exports.updateCartQuantity = async (req, res) => {
   }
 };
 
+// remove from cart
+
+module.exports.removeItemFromCart = async (req, res) => {
+  try{
+    // step 1: define user and the productId to be searched for
+    const userId = req.user.id;
+    const productId = req.params.productId;
+
+    // step 2: create a function to find the user using .findOne
+    const cart = await Cart.findOne({ userId });
+
+    // this line of code means if the cart function does not return anything, it will send a 404 status code with a message in json format
+    if(!cart){
+      return res.status(404).json({ message: `Cart not found for the user`})
+    }
+    
+    // set productIndex that searches the cart.cartItems array to find the index (position) of the cart item where the productId matches the one provided in the request.
+
+    // we compared the converted item.productId string to the route param which is also a string. In this way, we can accurately get the index of the product we're looking for.
+    const productIndex = cart.cartItems.findIndex(item => item.productId.toString() === productId);
+
+    // if productIndex is -1, that means the item wasn't found.
+    // we return early to avoid accidentally removing the wrong item from the end of the array.
+    if (productIndex === -1) {
+    return res.status(404).json({ message: "Product not found in cart" });
+}
+
+    // create a function where we remove one item starting at index productIndex.
+    const removedItem = cart.cartItems.splice(productIndex, 1)[0];
+
+    // this removes the item's subtotal from the overall cart.totalPrice
+    cart.totalPrice -= removedItem.subtotal;
+
+    await cart.save();
+
+    return res.status(200).json({
+      message: "Product removed from cart successfully",
+      cart
+    })
+  } catch(err){
+    console.error(err);
+    return res.status(500).json({ message: "Failed to remove product from cart" })
+  }
+}
+
 // clear cart
 
-// module.exports.clearCart = async (req, res) => {
-//   const userId = req.user.id;
+module.exports.clearCart = async (req, res) => {
+  const userId = req.user.id;
 
-//   if (req.user.isAdmin) {
-//     return res.status(403).json({ message: "Admins are not allowed to clear cart." });
-//   }
+  if (req.user.isAdmin) {
+    return res.status(403).json({ message: "Admins are not allowed to clear cart." });
+  }
 
-//   try {
-//     const cart = await Cart.findOne({ userId });
+  try {
+    const cart = await Cart.findOne({ userId });
 
-//     if (!cart) {
-//       return res.status(404).json({ message: "Cart not found." });
-//     }
+    if (!cart) {
+      return res.status(404).json({ message: "Cart not found." });
+    }
 
-//     // Clear cart items and reset total price
-//     cart.cartItems = [];
-//     cart.totalPrice = 0;
+    // Clear cart items and reset total price
+    cart.cartItems = [];
+    cart.totalPrice = 0;
 
-//     await cart.save();
+    await cart.save();
 
-//     return res.status(200).json({ message: "Cart cleared successfully.", cart });
-//   } catch (error) {
-//     return errorHandler(error, req, res);
-//   }
-// };
+    return res.status(200).json({ message: "Cart cleared successfully.", cart });
+  } catch (error) {
+    return errorHandler(error, req, res);
+  }
+};
+
