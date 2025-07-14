@@ -1,4 +1,5 @@
 const jwt = require("jsonwebtoken");
+const User = require("./models/User")
 require("dotenv").config();
 
 
@@ -14,19 +15,18 @@ module.exports.createAccessToken = (user) => {
 };
 
 // Verify User
-
 module.exports.verify = (req, res, next) => {
   let token = req.headers.authorization;
 
   if (typeof token === "undefined") {
-    return res.status(403).send({ auth: "Failed", message: "No Token" });
+    return res.status(401).send({ auth: "Failed", message: "No Token Provided" });
   } else {
     // removes "Bearer " - to include only the token
     token = token.slice(7, token.length);
 
     jwt.verify(token, process.env.JWT_SECRET_KEY, function (err, decodedToken) {
       if (err) {
-        return res.send({
+        return res.status(401).send({
           auth: "Failed",
           message: err.message,
         });
@@ -37,6 +37,7 @@ module.exports.verify = (req, res, next) => {
     });
   }
 };
+
 
 // Verify Admin User
 module.exports.verifyAdmin = (req, res, next) => {

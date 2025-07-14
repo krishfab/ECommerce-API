@@ -8,6 +8,7 @@ const cors = require("cors");
 const userRoutes = require("./routes/user");
 const productRoutes = require("./routes/product");
 const cartRoutes = require("./routes/cart");
+const orderRoutes = require("./routes/order");
 // const enrollmentRoutes = require("./routes/enrollment"); // <<
 
 // const passport = require("passport"); // passport package
@@ -52,14 +53,15 @@ mongoose.connection.once("open", () => console.log("Now connected to MongoDB Atl
 app.use("/users", userRoutes);
 app.use("/products", productRoutes);
 app.use("/cart", cartRoutes);
+app.use("/orders", orderRoutes)
 // app.use("/enrollment", enrollmentRoutes); // <<
 
 // [SECTION] Sever Gateway Response
-if(require.main === module) {
-  app.listen(process.env.PORT || 3000, () => {
-    console.log(`API is now online on port ${ process.env.PORT || 3000}`)
-  })
-}
+// if(require.main === module) {
+//   app.listen(process.env.PORT || 3000, () => {
+//     console.log(`API is now online on port ${ process.env.PORT || 3000}`)
+//   })
+// }
 
 // exports an object containing the value of the "app" variable only used for grading
 module.exports = { app, mongoose };

@@ -15,8 +15,12 @@ router.post("/add-to-cart", verify, cartController.addToCart);
 // update cart quantity
 router.patch("/update-cart-quantity", verify, cartController.updateCartQuantity);
 
+// remove item from cart route
+router.patch("/:productId/remove-from-cart", verify, cartController.removeItemFromCart)
+
 // clear cart - krisha
 
-// router.delete("/clear-cart", verify, cartController.clearCart);
+router.put("/clear-cart", verify, cartController.clearCart);
+
 
 module.exports = router;
